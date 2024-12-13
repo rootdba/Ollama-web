@@ -1,0 +1,226 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ollama API Interaction</title>
+    <!-- 引入 Prism.js 的 CSS -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 10px;
+            box-sizing: border-box;
+        }
+        .chat-container {
+            border: 1px solid #ccc;
+            padding: 10px;
+            height: 500px;
+            overflow-y: scroll;
+            margin-bottom: 20px;
+            background-color: #f9f9f9;
+        }
+        .user-message {
+            background-color: #e1ffc7;
+            padding: 5px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .api-response {
+            background-color: #eaf4ff;
+            padding: 5px;
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        label {
+            font-weight: bold;
+        }
+        input, select, textarea {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        @media (max-width: 600px) {
+            .chat-container {
+                height: 200px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h4>Ollama本地部署交互-Demo</h4>
+    <div class="chat-container" id="chat-container"></div>
+    <form onsubmit="return sendMessage(event)">
+        <!-- 选择模型 -->
+        <label for="model">选择模型:</label>
+        <select id="model" name="model">
+            <option value="llama3.2-vision:latest">llama3.2-vision:latest</option>
+            <option value="qwen2.5-coder:14b">qwen2.5-coder:14b</option>
+            <option value="qwen2.5:14b">qwen2.5:14b</option>
+			<option value="phi3.5:latest">phi3.5:latest</option>
+        </select>
+
+        <!-- 配置 IP 和端口 -->
+        <label for="ip">IP 地址:</label>
+        <input type="text" id="ip" name="ip" value="43.131.235.166" placeholder="IP 地址">
+
+        <label for="port">端口号:</label>
+        <input type="text" id="port" name="port" value="11434" placeholder="端口">
+
+        <!-- 输入提示文本 -->
+        <label for="prompt">输入提示文本:</label>
+        <textarea id="prompt" name="prompt" rows="4" cols="50" placeholder="输入提示文本按回车键发送" onkeydown="handleEnterKey(event)"></textarea>
+
+        <!-- 提交按钮 -->
+        <button type="submit">发送请求</button>
+    </form>
+
+    <!-- 引入 Prism.js 的 JavaScript -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-python.min.js"></script>
+
+    <script>
+        // 对话历史记录
+        let conversationHistory = [];
+
+        // 处理回车键事件
+        function handleEnterKey(event) {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault(); // 阻止默认的换行行为
+                sendMessage(event); // 调用发送消息的函数
+            }
+        }
+
+        async function sendMessage(event) {
+            event.preventDefault();
+
+            const model = document.getElementById('model').value;
+            const ip = document.getElementById('ip').value.trim();
+            const port = document.getElementById('port').value.trim();
+            const textarea = document.getElementById('prompt');
+            const promptText = textarea.value.trim();
+
+            if (promptText === '') {
+                return;
+            }
+
+            // 添加用户消息到对话历史
+            conversationHistory.push({
+                role: "user",
+                content: promptText
+            });
+
+            // 显示用户消息
+            displayMessage(promptText, 'user-message');
+
+            // 清空文本框
+            textarea.value = '';
+
+            // 构建输入数据对象
+            const inputData = {
+                model: model, // 用户选择的模型
+                messages: conversationHistory, // 对话历史记录
+                stream: false // 是否流式输出
+            };
+
+            try {
+                // 构建 API 请求 URL
+                const apiUrl = `http://${ip}:${port}/api/chat`;
+
+                // 发送 POST 请求到 Ollama API
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(inputData)
+                });
+
+                // 打印响应状态码和状态文本
+                console.log('Response Status:', response.status, response.statusText);
+
+                // 检查响应状态
+                if (!response.ok) {
+                    throw new Error(`请求失败，API 返回错误的状态码: ${response.status}`);
+                }
+
+                // 获取 JSON 响应
+                const result = await response.json();
+                console.log('API Response:', result);
+
+                // 添加 API 回复到对话历史
+                if (result.message && result.message.content) {
+                    conversationHistory.push({
+                        role: "assistant",
+                        content: result.message.content
+                    });
+
+                    // 显示 API 回复
+                    displayMessage(result.message.content, 'api-response');
+                } else {
+                    displayMessage('请求失败，API 返回无效的数据。', 'api-response');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                displayMessage(`请求过程中发生错误: ${error.message}`, 'api-response');
+            }
+        }
+
+        function displayMessage(message, className) {
+            const chatContainer = document.getElementById('chat-container');
+            const messageElement = document.createElement('div');
+            messageElement.className = className;
+
+            // 检测代码块并应用高亮
+            const codeBlockRegex = /```([\s\S]*?)```/g;
+            const highlightedMessage = message.replace(codeBlockRegex, (match, code) => {
+                const language = detectLanguage(code); // 检测代码语言
+                return `<pre><code class="language-${language}">${code}</code></pre>`;
+            });
+
+            messageElement.innerHTML = highlightedMessage;
+            chatContainer.appendChild(messageElement);
+
+            // 滚动到底部
+            chatContainer.scrollTop = chatContainer.scrollHeight;
+
+            // 应用 Prism.js 高亮
+            Prism.highlightAll();
+        }
+
+        // 检测代码语言
+        function detectLanguage(code) {
+            if (code.trim().startsWith("{")) {
+                return "json";
+            } else if (code.includes("def ") || code.includes("import ")) {
+                return "python";
+            } else if (code.includes("function") || code.includes("console.log")) {
+                return "javascript";
+            }
+            return "plaintext"; // 默认语言
+        }
+    </script>
+</body>
+</html>
