@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Ollama API Interaction</title>
+    <title>Ollama API交互</title>
     <!-- 引入 Prism.js 的 CSS -->
     <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet" />
     <style>
@@ -33,6 +32,7 @@
             padding: 5px;
             border-radius: 5px;
             margin-bottom: 10px;
+            word-wrap: break-word;
         }
         form {
             display: flex;
@@ -68,21 +68,23 @@
     </style>
 </head>
 <body>
-    <h4>Ollama本地部署交互-Demo</h4>
+    <h4>本地AI交互</h4>
     <div class="chat-container" id="chat-container"></div>
+
     <form onsubmit="return sendMessage(event)">
         <!-- 选择模型 -->
         <label for="model">选择模型:</label>
         <select id="model" name="model">
-            <option value="llama3.2-vision:latest">llama3.2-vision:latest</option>
-            <option value="qwen2.5-coder:14b">qwen2.5-coder:14b</option>
-            <option value="qwen2.5:14b">qwen2.5:14b</option>
-			<option value="phi3.5:latest">phi3.5:latest</option>
+			<option value="llama3.2:latest">llama3.2:latest</option>		
+            <option value="phi4:latest">phi4:latest</option>
+            <option value="mistral:latest">mistral:latest</option>
+            <option value="deepseek-coder-v2:16b">deepseek-coder-v2:16b</option>
+            <option value="qwen2.5:72b">qwen2.5:72b</option>          
         </select>
 
         <!-- 配置 IP 和端口 -->
         <label for="ip">IP 地址:</label>
-        <input type="text" id="ip" name="ip" value="43.131.235.166" placeholder="IP 地址">
+        <input type="text" id="ip" name="ip" value="127.0.0.1" placeholder="IP 地址">
 
         <label for="port">端口号:</label>
         <input type="text" id="port" name="port" value="11434" placeholder="端口">
@@ -193,11 +195,15 @@
             const messageElement = document.createElement('div');
             messageElement.className = className;
 
+            // 检测段落并应用换行
+            const paragraphRegex = /([^\n]+)\n/g;
+            const formattedMessage = message.replace(paragraphRegex, '<p>$1</p>');
+
             // 检测代码块并应用高亮
             const codeBlockRegex = /```([\s\S]*?)```/g;
-            const highlightedMessage = message.replace(codeBlockRegex, (match, code) => {
+            const highlightedMessage = formattedMessage.replace(codeBlockRegex, (match, code) => {
                 const language = detectLanguage(code); // 检测代码语言
-                return `<pre><code class="language-${language}">${code}</code></pre>`;
+                return `<pre><code class="language-${language}">${code.replace(/\n/g, '<br>')}</code></pre>`; // 保留换行符
             });
 
             messageElement.innerHTML = highlightedMessage;
@@ -209,10 +215,10 @@
             // 应用 Prism.js 高亮
             Prism.highlightAll();
         }
-
         // 检测代码语言
         function detectLanguage(code) {
             if (code.trim().startsWith("{")) {
+               
                 return "json";
             } else if (code.includes("def ") || code.includes("import ")) {
                 return "python";
